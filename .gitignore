@@ -1,0 +1,73 @@
+# =========================
+# Build folders
+# =========================
+build/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+Makefile
+*.cmake
+
+# =========================
+# VS Code
+# =========================
+.vscode/*
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/tasks.json
+!.vscode/extensions.json
+
+# =========================
+# STM32 / CubeIDE / CubeMX
+# =========================
+*.ioc.bak
+*.launch
+*.log
+*.tmp
+
+# Archivos generados automáticamente
+Core/Src/*.o
+Core/Src/*.d
+Core/Src/*.su
+Core/Src/*.map
+
+Core/Startup/*.o
+
+Drivers/**/*.o
+Drivers/**/*.d
+
+# =========================
+# Toolchain / compilación
+# =========================
+*.elf
+*.bin
+*.hex
+*.map
+*.a
+*.lib
+
+# =========================
+# Archivos temporales del sistema
+# =========================
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# =========================
+# Archivos de configuración local
+# =========================
+.clangd
+.settings/
+
+# =========================
+# CMake user presets (opcionales)
+# =========================
+CMakeUserPresets.json
+
+# =========================
+# Otros
+# =========================
+*.bak
+*.orig
