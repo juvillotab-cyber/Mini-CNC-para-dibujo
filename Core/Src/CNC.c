@@ -29,25 +29,25 @@ static void stepper_release(StepperMotor_t *m)
  *  BRESENHAM
  * ═══════════════════════════════════════════ */
 
-static void bres_load(CNC_t *cnc, int32_t tx, int32_t ty)
+static void bres_load(CNC_t *cnc, float tx, float ty)
 {
     CNC_Bresenham_t *b = &cnc->bres;
-    int32_t dx = tx - cnc->cur_x;
-    int32_t dy = ty - cnc->cur_y;
+    float dx = tx - cnc->cur_x;
+    float dy = ty - cnc->cur_y;
 
-    b->sx = (dx >= 0) ? 1 : -1;
-    b->sy = (dy >= 0) ? 1 : -1;
-    b->dx = (dx >= 0) ? dx : -dx;
-    b->dy = (dy >= 0) ? dy : -dy;
+    b->sx = (dx >= 0) ? 1.0f : -1.0f;
+    b->sy = (dy >= 0) ? 1.0f : -1.0f;
+    b->dx = fabsf(dx);
+    b->dy = fabsf(dy);
 
     cnc->motor_x.direction = (int8_t)b->sx;
     cnc->motor_y.direction = (int8_t)b->sy;
 
     if (b->dx >= b->dy) {
-        b->err        = 2 * b->dy - b->dx;
+        b->err        = 2.0f * b->dy - b->dx;
         b->steps_left = b->dx;
     } else {
-        b->err        = 2 * b->dx - b->dy;
+        b->err        = 2.0f * b->dx - b->dy;
         b->steps_left = b->dy;
     }
 }
@@ -63,18 +63,18 @@ static bool bres_step(CNC_t *cnc)
         if (b->err >= 0) {
             stepper_step(&cnc->motor_y);
             cnc->cur_y += b->sy;
-            b->err -= 2 * b->dx;
+            b->err -= 2.0f * b->dx;
         }
-        b->err += 2 * b->dy;
+        b->err += 2.0f * b->dy;
     } else {
         stepper_step(&cnc->motor_y);
         cnc->cur_y += b->sy;
         if (b->err >= 0) {
             stepper_step(&cnc->motor_x);
             cnc->cur_x += b->sx;
-            b->err -= 2 * b->dy;
+            b->err -= 2.0f * b->dy;
         }
-        b->err += 2 * b->dx;
+        b->err += 2.0f * b->dx;
     }
 
     b->steps_left--;
@@ -82,23 +82,35 @@ static bool bres_step(CNC_t *cnc)
 }
 
 /* ═══════════════════════════════════════════
- *  PARSER GCODE  (solo G0/G1 por ahora)
- *  Formato esperado: "G0 X10 Y20\n"
+ *  PARSER GCODE
+ *  Formato: "G0 X10.5 Y20.3 Z-2.0"
  * ═══════════════════════════════════════════ */
 
 static void gcode_parse(CNC_t *cnc, char *line)
 {
-    float x = cnc->cur_x;
-    float y = cnc->cur_y;
-
     char *px = strstr(line, "X");
     char *py = strstr(line, "Y");
+    char *pz = strstr(line, "Z");
 
-    if (px) x = (int32_t)atof(px + 1) * CNC_STEPS_PER_MM;
-    if (py) y = (int32_t)atof(py + 1) * CNC_STEPS_PER_MM;
+    /* Coordenadas XY en pasos */
+    if (px) cnc->target_x = (float)atof(px + 1) * CNC_STEPS_PER_MM;
+    else    cnc->target_x = cnc->cur_x;
 
-    bres_load(cnc, x, y);
-    cnc->state = CNC_MOVING;
+    if (py) cnc->target_y = (float)atof(py + 1) * CNC_STEPS_PER_MM;
+    else    cnc->target_y = cnc->cur_y;
+
+    /* Z: positivo sube, negativo baja */
+    if (pz) {
+        float z_mm = (float)atof(pz + 1);
+        cnc->z_direction        = (z_mm > 0) ? 1 : -1;
+        cnc->z_steps_left       = fabsf(z_mm) * CNC_STEPS_PER_MM;
+        cnc->motor_z.direction  = cnc->z_direction;
+        cnc->state              = CNC_MOVING_Z;   /* Z primero */
+    } else if (px || py) {
+        bres_load(cnc, cnc->target_x, cnc->target_y);
+        cnc->state = CNC_MOVING_XY;
+    }
+    /* si no hay nada, se queda en IDLE */
 }
 
 /* ═══════════════════════════════════════════
@@ -127,7 +139,7 @@ void CNC_Init(CNC_t *cnc, uint8_t step_mode)
     cnc->motor_y.direction = 1;
     cnc->motor_y.position  = 0;
 
-    /* Motor Z (reservado) */
+    /* Motor Z */
     cnc->motor_z.port[0] = M_Z1_GPIO_Port; cnc->motor_z.pin[0] = M_Z1_Pin;
     cnc->motor_z.port[1] = M_Z2_GPIO_Port; cnc->motor_z.pin[1] = M_Z2_Pin;
     cnc->motor_z.port[2] = M_Z3_GPIO_Port; cnc->motor_z.pin[2] = M_Z3_Pin;
@@ -138,10 +150,14 @@ void CNC_Init(CNC_t *cnc, uint8_t step_mode)
     cnc->motor_z.position  = 0;
 
     /* Estado */
-    cnc->state     = CNC_IDLE;
-    cnc->cur_x     = 0;
-    cnc->cur_y     = 0;
-    cnc->last_tick = 0;
+    cnc->state        = CNC_IDLE;
+    cnc->cur_x        = 0;
+    cnc->cur_y        = 0;
+    cnc->target_x     = 0;
+    cnc->target_y     = 0;
+    cnc->z_steps_left = 0;
+    cnc->z_direction  = 1;
+    cnc->last_tick    = 0;
 
     /* Buffer UART */
     memset(cnc->rx_buf, 0, CNC_RX_BUF_SIZE);
@@ -152,15 +168,14 @@ void CNC_Init(CNC_t *cnc, uint8_t step_mode)
     stepper_release(&cnc->motor_y);
     stepper_release(&cnc->motor_z);
 
-    /* Arranca recepción byte a byte */
     HAL_UART_Receive_IT(&huart1, &cnc->rx_byte, 1);
 }
 
 /*
- * CNC_UART_ISR — llamar desde HAL_UART_RxCpltCallback en main.c:
+ * Llamar desde main.c:
  *
  *   void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
- *       if (huart->Instance == USART2) CNC_UART_ISR(&cnc);
+ *       if (huart->Instance == USART1) CNC_UART_ISR(&cnc);
  *   }
  */
 void CNC_UART_ISR(CNC_t *cnc)
@@ -170,14 +185,14 @@ void CNC_UART_ISR(CNC_t *cnc)
     if (c == '\n' || c == '\r') {
         if (cnc->rx_idx > 0) {
             cnc->rx_buf[cnc->rx_idx] = '\0';
-            cnc->rx_ready = true;          /* señal para CNC_Run */
+            cnc->rx_ready = true;
+            cnc->rx_idx   = 0;   /* listo para la siguiente línea */
         }
     } else {
         if (cnc->rx_idx < CNC_RX_BUF_SIZE - 1)
             cnc->rx_buf[cnc->rx_idx++] = c;
     }
 
-    /* Reactiva la interrupción para el siguiente byte */
     HAL_UART_Receive_IT(&huart1, &cnc->rx_byte, 1);
 }
 
@@ -188,18 +203,46 @@ void CNC_Run(CNC_t *cnc)
 {
     switch (cnc->state)
     {
+        /* ── IDLE: espera línea nueva ── */
         case CNC_IDLE:
         {
             if (cnc->rx_ready) {
-                gcode_parse(cnc, cnc->rx_buf);        /* carga movimiento   */
+                gcode_parse(cnc, cnc->rx_buf);
                 memset(cnc->rx_buf, 0, CNC_RX_BUF_SIZE);
-                cnc->rx_idx   = 0;
                 cnc->rx_ready = false;
             }
             break;
         }
 
-        case CNC_MOVING:
+        /* ── MOVING_Z: mueve Z, luego pasa a XY si hay destino ── */
+        case CNC_MOVING_Z:
+        {
+            uint32_t now = HAL_GetTick();
+            if ((now - cnc->last_tick) < CNC_STEP_DELAY_MS) return;
+            cnc->last_tick = now;
+
+            if (cnc->z_steps_left > 0) {
+                stepper_step(&cnc->motor_z);
+                cnc->z_steps_left--;
+            }
+
+            if (cnc->z_steps_left <= 0) {
+                stepper_release(&cnc->motor_z);
+
+                /* ¿hay movimiento XY pendiente? */
+                if (cnc->target_x != cnc->cur_x || cnc->target_y != cnc->cur_y) {
+                    bres_load(cnc, cnc->target_x, cnc->target_y);
+                    cnc->state = CNC_MOVING_XY;
+                } else {
+                    cnc->state = CNC_IDLE;
+                    HAL_UART_Transmit(&huart1, (uint8_t*)"ok\r\n", 4, 100);
+                }
+            }
+            break;
+        }
+
+        /* ── MOVING_XY: Bresenham paso a paso ── */
+        case CNC_MOVING_XY:
         {
             uint32_t now = HAL_GetTick();
             if ((now - cnc->last_tick) < CNC_STEP_DELAY_MS) return;
@@ -210,7 +253,6 @@ void CNC_Run(CNC_t *cnc)
                 stepper_release(&cnc->motor_x);
                 stepper_release(&cnc->motor_y);
                 cnc->state = CNC_IDLE;
-
                 HAL_UART_Transmit(&huart1, (uint8_t*)"ok\r\n", 4, 100);
             }
             break;
