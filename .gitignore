@@ -1,0 +1,51 @@
+# ── Python ──
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+*.egg-info/
+
+# ── Compilacion (STM32 + ESP32) ──
+build/
+build-debug/
+build-release/
+*.o
+*.d
+*.elf
+*.bin
+*.map
+*.hex
+*.ninja
+*.ninja_deps
+*.ninja_log
+compile_commands.json
+.flash*
+
+# ── ESP32 (ESP-IDF) ──
+sdkconfig
+sdkconfig.old
+sdkconfig.release
+spiffs/
+managed_components/
+dependencies.lock
+
+# ── STM32 CubeMX ──
+*.mxproject
+
+# ── VS Code / IDEs ──
+.vscode/
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/c_cpp_properties.json
+.idea/
+*.swp
+*.swo
+*~
+
+# ── Sistema operativo ──
+.DS_Store
+Thumbs.db
+
+# ── Logs ──
+*.log
