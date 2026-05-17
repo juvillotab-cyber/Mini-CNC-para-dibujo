@@ -333,7 +333,7 @@ cd ESP32-CNC && idf.py -p /dev/ttyUSB0 flash
 
 ## Archivos de Ejemplo
 
-- **`Circle.nc`** — Círculo de ~48mm de diámetro con 66 puntos, velocidad de avance F762.0
+- **`Circle.nc`** — Círculo de ~48mm de diámetro con 66 puntos.
 - Ubicación: `Mini-CNC-para-dibujo-v2.1/Circle.nc`
 
 ---
