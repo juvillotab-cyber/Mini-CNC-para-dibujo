@@ -304,6 +304,15 @@ python3 CNC.py Circle.nc /dev/ttyUSB0
 
 ## Compilación y Despliegue
 
+### Entorno de Desarrollo
+
+El proyecto fue desarrollado en **Visual Studio Code** con las siguientes extensiones:
+
+- **STM32CubeMX / STM32** — generación de código HAL, depuración y flasheo del STM32F030
+- **ESP-IDF** — compilación, flasheo y monitoreo del ESP32-C3
+- **clangd** — análisis estático y autocompletado para C/C++
+- **CMake Tools** — configuración y compilación con presets
+
 ### Requisitos
 
 - **ESP32-C3:** [ESP-IDF v5.5+](https://docs.espressif.com/projects/esp-idf/)
