@@ -23,7 +23,6 @@ compile_commands.json
 .flash*
 
 # ── ESP32 (ESP-IDF) ──
-sdkconfig
 sdkconfig.old
 sdkconfig.release
 spiffs/
